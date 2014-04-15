@@ -28,7 +28,7 @@ class Deferred:
 class SceneNode:
 	def __init__(self,name,graphnode):
 		self.name = name
-		self.sub_nodes = dict(name,SceneNode(name,node) for name,node in graphnode['sub_nodes'])
+		self.sub_nodes = dict((name,SceneNode(name,node)) for name,node in graphnode['sub_nodes'])
 		runtime_type = graphnode['type']
 		runtime_args, runtime_kwargs = graphnode['args'],graphnode['kwargs']
 		self.runtime_object = SceneNode.make_object(runtime_type,*runtime_args,**runtime_kwargs)
@@ -51,4 +51,3 @@ class SceneManager:
 	def __init__(self,initial_scene,initial_scope):
 		self.initial_scene = self.scene = initial_scene
 		self.initial_scope = self.scope = initial_scope
-	def load_scope(
