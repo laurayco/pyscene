@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import json
+import json, imp, os, functools
 
 split_pieces = lambda s,n:iter(t.strip() for t in s.split(n))
 
@@ -27,6 +27,16 @@ class Deferred:
 	def reject(self,*a,**k):self.pop().on_reject(*a,**k)
 	def promise(self):self.push(Promise())
 
+class ModuleCache:
+	@classmethod
+	@functools.lru_cache(10)
+	def get_module(cls,name):
+		return imp.load_source(name[-1],os.path.sep.join(name)+".py")
+	@classmethod
+	def load_object(cls,*scope):
+		module,typename=scope[:-1],scope[-1]
+		return getattr(cls.get_module(module),typename)
+
 class SceneNode:
 	def __init__(self,name,graphnode):
 		self.name = name
@@ -37,13 +47,11 @@ class SceneNode:
 		self.runtime_object = SceneNode.make_object(runtime_type,*runtime_args,**runtime_kwargs)
 	@classmethod
 	def make_object(cls,typename,*args,**kwargs):
-		typename = list(split_pieces(typename,"."))
-		module,instance = typename[:-1],typename[-1]
-		#instance = load_module(module)[instance]
-		#instance = instance(*args,**kwargs)
-		return instance
-	def tick(self,scene_manager,scene_scope,*a,**k):
-		print(self.runtime_object,self.name)
+		rt_type = ModuleCache.load_object(*list(split_pieces(typename,".")))
+		return rt_type(*args,**kwargs)
+	def tick(self,scene_manager,*a,**k):
+		#print(self.runtime_object,self.name)#
+		self.runtime_object.tick(self,scene_manager,*a,**k)
 
 class SceneScope:
 	def __init__(self,root_scene,scope=None):
@@ -54,7 +62,7 @@ class SceneScope:
 		self.tick_step += 1
 		for path,ticks in self.scope_frequency.items():
 			if ticks==1 or self.tick_step%ticks==0:#ran every tick
-				self.get_node(path).tick(manager,self,*a,**k)
+				self.get_node(path).tick(manager,*a,**k)
 	def get_node(self,path,root_node=None):
 		root_node = root_node or self.root_scene
 		path = list(split_pieces(path,".")) if isinstance(path,str) else path
@@ -71,14 +79,14 @@ class SceneManager:
 
 if __name__=="__main__":
 	root_node = SceneNode("title_screen",{
-		"type":"pypk.TitleScreen",
+		"type":"txtgame.TitleScreen",
 		"sub_nodes":{
 			"text_flasher":{
-				"type":"pypk.TextFlasher",
+				"type":"txtgame.TextFlasher",
 				"args":["Press `Enter` to continue!"],
 				"sub_nodes":{
 					"exit_titlescreen":{
-						"type":"pypk.ContinueOnEnter",
+						"type":"txtgame.ContinueOnEnter",
 					}
 				}
 			}
