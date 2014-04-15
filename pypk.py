@@ -43,14 +43,14 @@ class SceneNode:
 		subs = graphnode.get('sub_nodes',{})
 		self.sub_nodes = dict((name,SceneNode(name,node)) for name,node in subs.items())
 		runtime_type = graphnode['type']
-		runtime_args, runtime_kwargs = graphnode.get('args',[]),graphnode.get('kwargs',{})
-		self.runtime_object = SceneNode.make_object(runtime_type,*runtime_args,**runtime_kwargs)
+		if runtime_type:
+			args, kwargs = graphnode.get('args',[]),graphnode.get('kwargs',{})
+			self.runtime_object = SceneNode.make_object(runtime_type,*args,**kwargs)
 	@classmethod
 	def make_object(cls,typename,*args,**kwargs):
 		rt_type = ModuleCache.load_object(*list(split_pieces(typename,".")))
 		return rt_type(*args,**kwargs)
 	def tick(self,scene_manager,*a,**k):
-		#print(self.runtime_object,self.name)#
 		self.runtime_object.tick(self,scene_manager,*a,**k)
 
 class SceneScope:
@@ -97,5 +97,6 @@ if __name__=="__main__":
 		"text_flasher.exit_titlescreen":1
 	})
 	manager = SceneManager(root_node,root_scope)
-	while True:
+	for i in range(16000):
 		manager.tick()
+	print()
