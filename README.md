@@ -10,10 +10,6 @@ reflect similar calls across all callbacks.
 A Promise object is used to provide a definite way
 to ensure things are called in a certain order.
 
-##Deferred
-This is used to ensure Promise objects are only
-triggered once per event.
-
 ##ModuleCache
 The ModuleCache is used only in a static context,
 and is used to dynamically load objects from modules
