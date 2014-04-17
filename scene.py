@@ -1,31 +1,9 @@
 #!/usr/bin/env python
 
 import json, imp, os, functools
+from promise import MetaEvent, Promise
 
 split_pieces = lambda s,n:iter(t.strip() for t in s.split(n))
-
-class MetaEvent:
-	def __init__(self):self.handlers=[]
-	def __call__(self,*a,**k):
-		for e in self.handlers:
-			e(*a,**k)
-
-class Promise:
-	def __init__(self):
-		self.on_resolve = MetaEvent()
-		self.on_reject = MetaEvent()
-		self.then = self.on_resolve.handlers.append
-		self.catch = self.on_reject.handlers.append
-
-class Deferred:
-	def __init__(self):self.promises = []
-	def push(self,o):self.promises.append(o)
-	def pop(self):
-		r,self.promises=self.promises[-1],self.promises[:-1]
-		return r
-	def resolve(self,*a,**k):self.pop().on_resolve(*a,**k)
-	def reject(self,*a,**k):self.pop().on_reject(*a,**k)
-	def promise(self):self.push(Promise())
 
 class ModuleCache:
 	@classmethod
@@ -38,20 +16,21 @@ class ModuleCache:
 		return getattr(cls.get_module(module),typename)
 
 class SceneNode:
-	def __init__(self,name,graphnode):
+	def __init__(self,name,graphnode,parent=None):
 		self.name = name
+		self.parent = parent
 		subs = graphnode.get('sub_nodes',{})
-		self.sub_nodes = dict((name,SceneNode(name,node)) for name,node in subs.items())
+		self.sub_nodes = dict((name,SceneNode(name,node,self)) for name,node in subs.items())
 		runtime_type = graphnode['type']
 		if runtime_type:
 			args, kwargs = graphnode.get('args',[]),graphnode.get('kwargs',{})
-			self.runtime_object = SceneNode.make_object(runtime_type,*args,**kwargs)
+			self.runtime_object = SceneNode.make_object(self,runtime_type,*args,**kwargs)
 	@classmethod
-	def make_object(cls,typename,*args,**kwargs):
+	def make_object(cls,node,typename,*args,**kwargs):
 		rt_type = ModuleCache.load_object(*list(split_pieces(typename,".")))
-		return rt_type(*args,**kwargs)
+		return rt_type(node,*args,**kwargs)
 	def tick(self,scene_manager,*a,**k):
-		self.runtime_object.tick(self,scene_manager,*a,**k)
+		self.runtime_object.tick(scene_manager,*a,**k)
 
 class SceneScope:
 	def __init__(self,root_scene,scope=None):
@@ -78,25 +57,17 @@ class SceneManager:
 		self.scope.tick(self,*a,**k)
 
 if __name__=="__main__":
-	root_node = SceneNode("title_screen",{
-		"type":"txtgame.TitleScreen",
-		"sub_nodes":{
-			"text_flasher":{
-				"type":"txtgame.TextFlasher",
-				"args":["Press `Enter` to continue!"],
-				"sub_nodes":{
-					"exit_titlescreen":{
-						"type":"txtgame.ContinueOnEnter",
-					}
-				}
-			}
-		}
-	})
-	root_scope = SceneScope(root_node,{
-		"text_flasher":4,
-		"text_flasher.exit_titlescreen":1
-	})
-	manager = SceneManager(root_node,root_scope)
-	for i in range(16000):
-		manager.tick()
-	print()
+	from sys import argv; argv=argv[1:]
+	scene,scope=None,None
+	try:
+		assert len(argv)==2
+		with open(argv[0]) as f:
+			scene = SceneNode(json.load(f))
+			with open(argv[1]) as ff:
+				scope = SceneScope(scene,json.load(ff))
+	except:
+		print("Usage: scene.py <scene_file> <scope_file>")
+	finally:
+		if scene and scope:
+			mgr = SceneManager(scene,scope)
+			while mgr.available: mgr.tick()
