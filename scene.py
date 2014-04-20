@@ -50,6 +50,7 @@ class SceneScope:
 		return root_node.sub_nodes[path[0]]
 
 class SceneManager:
+	available = True
 	def __init__(self,initial_scene,initial_scope):
 		self.initial_scene = self.scene = initial_scene
 		self.initial_scope = self.scope = initial_scope
@@ -62,10 +63,10 @@ if __name__=="__main__":
 	try:
 		assert len(argv)==2
 		with open(argv[0]) as f:
-			scene = SceneNode(json.load(f))
+			scene = SceneNode(argv[0],json.load(f))
 			with open(argv[1]) as ff:
 				scope = SceneScope(scene,json.load(ff))
-	except:
+	except AssertionError:
 		print("Usage: scene.py <scene_file> <scope_file>")
 	finally:
 		if scene and scope:

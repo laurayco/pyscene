@@ -15,18 +15,19 @@ class NodeObject:
 		filters = filters or []
 		def get_all():
 			for name,node in self.node.sub_nodes.items():
-				if not all([f(node) for f in filters])
-				val = node.runtime_object if objects and node.runtime_object else node
-				yield name,val
+				if all([f(node) for f in filters]):
+					val = node.runtime_object if objects and node.runtime_object else node
+					yield name,val
 		return dict(get_all())
 	def require_child(self,satisfies):
-		for name,node in self.get_children(False):
+		for name,node in self.get_children(False).items():
 			if satisfies(name,node):
 				yield name,node
 	def tick(self,manager,*a,**k):pass
 
 class Timer(NodeObject):
-	def __init__(self,frequency,buffer=False):
+	def __init__(self,node,frequency,buffer=False):
+		super().__init__(node)
 		self.timer = pygame.time.Clock()
 		self.elapsed = 0
 		self.buffer = buffer
@@ -44,18 +45,13 @@ class Timer(NodeObject):
 
 class Animation(NodeObject):
 	def __init__(self,node,repeat=None,direction=1):
-		super()(node)
+		super().__init__(node)
 		# assert that there is at least one animation channel involved.
-		assert self.require_child(partial(isinstancereverse,AnimationChannel))>0
+		assert len(tuple(self.require_child(partial(isinstancereverse,AnimationChannel))))>0
 		self.repeat = repeat
 		self.direction = direction
 		#to-do: calculate max number of steps needed.
 		#       [ use sub_nodes to determine this. ]
-		needed_steps = 100
-		step_frequency = duration / needed_steps
-		self.timer = TimeTracker(step_frequency,buffer=True)
-		self.completion = 0
-		self.on_calculate = MetaEvent()
 	def calculate(self,remaining):
 		channels = {}
 		for path,node in self.get_children(True,filters=[lambda name,node:isinstance(node.runtime_object,AnimationChannel)]):
@@ -64,7 +60,7 @@ class Animation(NodeObject):
 
 class AnimationChannel(NodeObject):
 	def __init__(self,node,start=0,final=100,method='linear'):
-		super()(node)
+		super().__init__(node)
 		self.start = start
 		self.final = final
 		self.method = method
@@ -77,7 +73,7 @@ class AnimationChannel(NodeObject):
 
 class Window(NodeObject):
 	def __init__(self,node,press_threshold=250):
-		super()(node)
+		super().__init__(node)
 		self.press_threshold = press_threshold
 		self.on_click = MetaEvent()
 		self.on_keydown = MetaEvent()
@@ -88,7 +84,7 @@ class Window(NodeObject):
 
 class Camera(NodeObject):
 	def __init__(self,node):
-		super()(node)
+		super().__init__(node)
 	def get_painted_objects(self):
 		"""Return an iterable object of all
 		objects that should be painted on by
@@ -104,7 +100,7 @@ class Camera(NodeObject):
 
 class PaintedObject(NodeObject):
 	def __init__(self,node):
-		super()(node)
+		super().__init__(node)
 	def needs_repaint(self):
 		"""Return True if when calling 'paint',
 		there should be a different output than
@@ -120,8 +116,8 @@ class PaintedObject(NodeObject):
 		pass
 
 class ColorFade(Animation):
-	def __init__(self,node,duration=1000,direction='alternate',repeat=0):
-		super()(node,duration,repeat,direction)
+	def __init__(self,node,direction='alternate',repeat=0):
+		super().__init__(node,repeat,direction)
 		ischannel = partial(isinstancereverse,AnimationChannel)
 		assert self.get_child('red') is not None
 		assert self.get_child('green') is not None
@@ -129,7 +125,7 @@ class ColorFade(Animation):
 
 class ColorPulser(PaintedObject):
 	def __init__(self,node):
-		super()(node)
+		super().__init__(node)
 		self.color_animation = self.get_child('color')
 		assert self.color_animation is not None
 		self.color = self.color_animation.calculate()
@@ -139,9 +135,9 @@ class ColorPulser(PaintedObject):
 	def is_visible(self): return True
 	def paint(self,surface): surface.fill(self.color)
 
-class Screen:
+class Screen(NodeObject):
 	def __init__(self,node,resolution=(320,240),flags=0):
-		super()(node)
+		super().__init__(node)
 		self.resolution = resolution
 		self.window_flags = flags
 	def ensure_window(self):
@@ -150,7 +146,7 @@ class Screen:
 		if not pygame.display.get_surface():
 			pygame.display.set_mode(self.resolution,self.window_flags)
 	def tick(self,manager,*a,**k):
-		needs_update = []]
+		needs_update = []
 		def is_camera(node):
 			return isinstance(node.runtime_object,PaintedObject)
 		for name,camera in self.get_children(objects=True,filters=[is_camera]):
